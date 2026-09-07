@@ -1,0 +1,20 @@
+[project]
+name = "forgeci"
+version = "0.1.0"
+description = "Distributed continuous integration platform"
+requires-python = ">=3.12"
+
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "httpx",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
