@@ -1,4 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+import hashlib
+import hmac
+import os
+import json
 
 app = FastAPI(
     title = "ForgeCI",
@@ -14,7 +18,15 @@ def health_check():
 
 
 @app.post("/webhooks/github")
-async def github_webhook(payload: dict):
+async def github_webhook(request: Request):
+
+    body = await request.body()
+
+    signature = request.headers.get("X-Hub-Signature-256")
+
+    verify_github_signature(body, signature)
+
+    payload = json.loads(body)
 
     repository = payload.get("repository", {})
     repo_name = repository.get("full_name")
@@ -29,3 +41,32 @@ async def github_webhook(payload: dict):
         "ref": branch
     }
 
+#helper function to check if webhook request came from GitHub
+def verify_github_signature(body: bytes, signature: str | None):
+    secret = os.getenv("GITHUB_WEBHOOK_SECRET")
+
+    if not secret:
+        raise HTTPException(
+            status_code = 500,
+            detail = "GitHub webhook secret is not configured"
+        )
+
+    if not signature:
+        raise HTTPException(
+            status_code= 403,
+            detail = "Missing GitHub signature"
+        )
+    #github webhook signature format uses HMAC with SHAH-256
+    expected_signature = (
+        "sha256=" + hmac.new(
+            secret.encode(),
+            body,
+            hashlib.sha256
+        ).hexdigest()
+    )
+
+    if not hmac.compare_digest(expected_signature, signature):
+        raise HTTPException(
+            status_code = 403,
+            detail= "Invalid GitHub signature"
+        )
