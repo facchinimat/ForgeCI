@@ -37,7 +37,8 @@ def test_github_webhook(monkeypatch):
         content=body,
         headers={
             "Content-Type": "application/json",
-            "X-Hub-Signature-256": signature
+            "X-Hub-Signature-256": signature,
+            "X-GitHub-Event": "push"
         }
         )
 
@@ -45,7 +46,7 @@ def test_github_webhook(monkeypatch):
 
     data = response.json()
 
-    assert data["message"] == "Github webhook received"
+    assert data["message"] == "GitHub push received"
     assert data["repository"] == "facchinimat/test-project"
     assert data["commit"] == "abc123def456"
     assert data["ref"] == "refs/heads/main"
@@ -97,3 +98,41 @@ def test_github_webhook_invalid_signature(monkeypatch):
 
     assert response.status_code== 403
     assert response.json()["detail"]== "Invalid GitHub signature"
+
+
+def test_github_ping_is_ingored(monkeypatch):
+    secret = "forgeci-test-secret"
+
+    monkeypatch.setenv(
+        "GITHUB_WEBHOOK_SECRET",
+        secret
+    )
+
+    payload = {
+        "zen": "Testing"
+    }
+
+    body = json.dumps(payload).encode()
+
+    signature = (
+        "sha256=" + hmac.new(
+            secret.encode(),
+            body,
+            hashlib.sha256
+        ).hexdigest()
+    )
+
+    response = client.post(
+        "/webhooks/github",
+        content = body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Hub-Signature-256": signature,
+            "X-GitHub-Event": "ping"
+        }
+    )
+
+
+    assert response.status_code==200
+    assert response.json()["message"] == "GitHub event ingored"
+    assert response.json()["event"] == "ping"

@@ -26,6 +26,20 @@ async def github_webhook(request: Request):
 
     verify_github_signature(body, signature)
 
+    event = request.headers.get("X-GitHub-Event")
+
+    if not event:
+        raise HTTPException(
+            status_code = 400,
+            detail = "Missing GitHub event type"
+        )
+
+    if event != "push":
+        return {
+            "message": "GitHub event ingored",
+            "event": event
+        }
+
     payload = json.loads(body)
 
     repository = payload.get("repository", {})
@@ -35,7 +49,7 @@ async def github_webhook(request: Request):
     branch = payload.get("ref")
 
     return {
-        "message": "Github webhook received",
+        "message": "GitHub push received",
         "repository": repo_name,
         "commit": commit_sha,   #secure hash algorithm 
         "ref": branch
