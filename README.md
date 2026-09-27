@@ -21,6 +21,9 @@ Currently implemented:
 - SQLAlchemy + psycopg database connectivity
 - Environment-based secret and database configuration
 - Local webhook development through an HTTPS tunnel
+- PostgreSQL-backed Build model
+- Persistent build records created from GitHub push events
+- Isolated temporary SQLite database for automated tests
 
 Current automated test coverage includes:
 
@@ -29,6 +32,8 @@ Current automated test coverage includes:
 - Missing webhook signatures
 - Invalid webhook signatures
 - Non-push GitHub event handling
+- Build persistence from push events
+- Invalid/malformed push payloads
 
 ## Architecture
 
@@ -132,23 +137,32 @@ When code is pushed to a configured repository:
    - repository name
    - commit SHA
    - Git reference / branch
-8. The event is acknowledged with an HTTP response.
+8. ForgeCI creates a new `Build` record with an initial `pending` status.
+9. The build is persisted to PostgreSQL.
+10. ForgeCI returns an HTTP response containing the build ID and build metadata.
 
-This allows ForgeCI to identify the exact version of a repository that should eventually be scheduled for testing.
+This allows ForgeCI to persist the exact repository version associated with each push so the build can later be queued and processed by CI workers.
 
 ## Project Structure
 
 ```text
 ForgeCI/
+├── .github/
+│   └── workflows/
+│       └── tests.yml
+│
 ├── src/
 │   └── forgeci/
 │       ├── __init__.py
 │       ├── database.py
+│       ├── init_db.py
+│       ├── models.py
 │       └── api/
 │           ├── __init__.py
 │           └── main.py
 │
 ├── tests/
+│   ├── conftest.py
 │   ├── test_health.py
 │   └── test_webhook.py
 │
@@ -177,7 +191,7 @@ source .venv/bin/activate
 ### 3. Install dependencies
 
 ```bash
-pip install fastapi "uvicorn[standard]" pytest httpx sqlalchemy "psycopg[binary]"
+pip install -e ".[dev]"
 ```
 
 ### 4. Configure environment variables
@@ -197,7 +211,13 @@ Never commit real secrets or database passwords to the repository.
 sudo service postgresql start
 ```
 
-### 6. Run the API
+### 6. Create the database tables
+
+```bash
+PYTHONPATH=src python -m forgeci.init_db
+```
+
+### 7. Run the API
 
 ```bash
 PYTHONPATH=src uvicorn forgeci.api.main:app --reload
@@ -229,7 +249,8 @@ Run the ForgeCI test suite with:
 pytest
 ```
 
-The tests currently verify both normal API behavior and webhook authentication failure cases.
+The test suite verifies API behavior, webhook authentication, malformed payload handling, and persistent Build creation using an isolated temporary SQLite database.
+Tests use a temporary SQLite database so automated test runs do not modify the development PostgreSQL database.
 
 ## Security
 
@@ -253,8 +274,8 @@ The next development milestones are:
 - [x] GitHub event filtering
 - [x] Real GitHub push integration
 - [x] PostgreSQL connectivity
-- [ ] Build database model and persistence
-- [ ] Create build records from push events
+- [x] Build database model and persistence
+- [x] Create build records from push events
 - [ ] Redis-backed job queue
 - [ ] CI worker process
 - [ ] Repository cloning and commit checkout
