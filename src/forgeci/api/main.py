@@ -4,6 +4,9 @@ import hmac
 import os
 import json
 
+from forgeci.database import SessionLocal
+from forgeci.models import Build
+
 app = FastAPI(
     title = "ForgeCI",
     version = "0.1.0"
@@ -36,7 +39,7 @@ async def github_webhook(request: Request):
 
     if event != "push":
         return {
-            "message": "GitHub event ingored",
+            "message": "GitHub event ignored",
             "event": event
         }
 
@@ -48,11 +51,30 @@ async def github_webhook(request: Request):
     commit_sha = payload.get("after")
     branch = payload.get("ref")
 
+    if not repo_name or not commit_sha or not branch:
+        raise HTTPException(
+            status_code = 400,
+            detail="Invalid GitHub push payload"
+        )
+
+    build = Build(
+        repository = repo_name,
+        commit_sha = commit_sha,
+        ref = branch
+    )
+
+    with SessionLocal() as session:
+        session.add(build)
+        session.commit()
+        session.refresh(build)
+
     return {
         "message": "GitHub push received",
+        "build_id": build.id,
         "repository": repo_name,
         "commit": commit_sha,   #secure hash algorithm 
-        "ref": branch
+        "ref": branch,
+        "status": build.status
     }
 
 #helper function to check if webhook request came from GitHub
@@ -70,7 +92,7 @@ def verify_github_signature(body: bytes, signature: str | None):
             status_code= 403,
             detail = "Missing GitHub signature"
         )
-    #github webhook signature format uses HMAC with SHAH-256
+    #github webhook signature format uses HMAC with SHA-256
     expected_signature = (
         "sha256=" + hmac.new(
             secret.encode(),

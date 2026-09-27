@@ -100,7 +100,7 @@ def test_github_webhook_invalid_signature(monkeypatch):
     assert response.json()["detail"]== "Invalid GitHub signature"
 
 
-def test_github_ping_is_ingored(monkeypatch):
+def test_github_ping_is_ignored(monkeypatch):
     secret = "forgeci-test-secret"
 
     monkeypatch.setenv(
@@ -134,5 +134,5 @@ def test_github_ping_is_ingored(monkeypatch):
 
 
     assert response.status_code==200
-    assert response.json()["message"] == "GitHub event ingored"
+    assert response.json()["message"] == "GitHub event ignored"
     assert response.json()["event"] == "ping"
