@@ -1,5 +1,7 @@
 # ForgeCI
 
+[![ForgeCI Tests](https://github.com/facchinimat/ForgeCI/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/facchinimat/ForgeCI/actions/workflows/tests.yml)
+
 ForgeCI is a work-in-progress continuous integration platform built to explore the systems behind modern CI/CD infrastructure.
 
 The project currently receives authenticated GitHub webhook events, identifies the exact repository, branch, and commit associated with a push, and connects to PostgreSQL for persistent build-state storage. The long-term goal is to evolve this into a distributed CI system with queued jobs, concurrent workers, isolated Docker execution, failure recovery, and GitHub status reporting.
